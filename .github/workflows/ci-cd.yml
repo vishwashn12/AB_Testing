@@ -207,7 +207,6 @@ jobs:
     name: 🚀 Deployment Artifact
     runs-on: ubuntu-latest
     needs: [build, test, coverage, lint, security]
-    if: always()
 
     steps:
       - name: Checkout repository
