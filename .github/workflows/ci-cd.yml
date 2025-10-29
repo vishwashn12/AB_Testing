@@ -73,7 +73,7 @@ jobs:
       - name: Run Frontend Tests
         run: |
           echo "Running frontend tests..."
-          npm run test:frontend || echo "No frontend tests yet"
+          npm run test:frontend
 
   # ======================================
   # COVERAGE STAGE
@@ -201,30 +201,54 @@ jobs:
           # Create reports directory
           mkdir -p reports
           
-          # Generate backend test results
+          # ============================================
+          # BACKEND REPORTS
+          # ============================================
           echo "Generating backend reports..."
           cd apps/backend
+          
+          # Backend tests
           npm test || echo "Backend tests completed"
           cp -r test-results ../../reports/backend-test-results 2>/dev/null || echo "No backend test results"
           cp junit.xml ../../reports/ 2>/dev/null || echo "No junit.xml"
           
-          # Generate backend coverage
+          # Backend coverage
           npm run coverage || npx jest --coverage || echo "Coverage completed"
           cp -r coverage ../../reports/backend-coverage 2>/dev/null || echo "No coverage directory"
           cp lcov.info ../../reports/backend-lcov.info 2>/dev/null || echo "No lcov.info"
           
           cd ../..
           
-          # Generate lint reports
+          # ============================================
+          # FRONTEND REPORTS
+          # ============================================
+          echo "Generating frontend reports..."
+          cd apps/frontend
+          
+          # Frontend tests & coverage
+          npm run coverage || echo "Frontend coverage completed"
+          cp -r coverage ../../reports/frontend-coverage 2>/dev/null || echo "No frontend coverage directory"
+          
+          cd ../..
+          
+          # ============================================
+          # LINT REPORTS
+          # ============================================
+          echo "Generating lint reports..."
           mkdir -p reports/lint-report
+          
           cd apps/backend
           npx eslint . --ext .js -f html -o ../../reports/lint-report/backend-eslint.html 2>/dev/null || echo "Backend lint report generated"
+          
           cd ../frontend
           npx eslint . --ext .js,.jsx -f html -o ../../reports/lint-report/frontend-eslint.html 2>/dev/null || echo "Frontend lint report generated"
           
           cd ../..
           
-          # Generate security report
+          # ============================================
+          # SECURITY REPORT
+          # ============================================
+          echo "Generating security report..."
           npm audit --json > reports/security-report.json || echo "Security audit completed"
 
       - name: Create production deployment package
@@ -232,70 +256,182 @@ jobs:
           echo "Creating production deployment package..."
           mkdir -p deployment
           
-          # Copy backend
+          # ============================================
+          # BACKEND - Copy source and dependencies info
+          # ============================================
+          echo "Packaging backend..."
           mkdir -p deployment/backend
+          
+          # Copy backend source code
           cp -r apps/backend/src deployment/backend/
+          
+          # Copy backend config files
           cp apps/backend/package.json deployment/backend/
-          cp apps/backend/.env.example deployment/backend/ 2>/dev/null || echo "No backend .env.example"
+          cp apps/backend/.env.example deployment/backend/ 2>/dev/null || echo "Warning: No .env.example found"
           
-          # Copy frontend build
-          mkdir -p deployment/frontend
-          cp -r apps/frontend/dist deployment/frontend/ 2>/dev/null || echo "No frontend dist"
-          cp apps/frontend/package.json deployment/frontend/
-          
-          # Copy documentation
-          cp -r docs deployment/docs 2>/dev/null || echo "No docs"
-          cp README.md deployment/
-          
-          # Copy reports
-          cp -r reports deployment/reports/
-          
-          # Copy root package-lock.json for backend dependencies
+          # Copy only package-lock for dependency installation (not node_modules)
           cp package-lock.json deployment/backend/
           
-          # Install production dependencies for backend
-          cd deployment/backend
-          npm ci --production --ignore-scripts
-          cd ../..
+          # ============================================
+          # FRONTEND - Copy built static files
+          # ============================================
+          echo "Packaging frontend..."
+          mkdir -p deployment/frontend
           
-          # Create deployment README
+          # Copy frontend dist (built files)
+          if [ -d "apps/frontend/dist" ]; then
+            cp -r apps/frontend/dist/* deployment/frontend/
+            echo "✓ Frontend build included"
+          else
+            echo "⚠ No frontend build found - run 'npm run build:frontend' first"
+          fi
+          
+          # ============================================
+          # DOCUMENTATION & REPORTS
+          # ============================================
+          echo "Copying documentation and reports..."
+          
+          # Copy docs
+          if [ -d "docs" ]; then
+            cp -r docs deployment/
+          fi
+          
+          # Copy root README
+          cp README.md deployment/ 2>/dev/null || true
+          
+          # Copy CI/CD reports
+          if [ -d "reports" ]; then
+            cp -r reports deployment/
+          fi
+          
+          # ============================================
+          # CREATE DEPLOYMENT INSTRUCTIONS
+          # ============================================
           cat > deployment/DEPLOY.md << 'EOF'
-          # Deployment Instructions
+          # 🚀 Deployment Guide
           
-          ## Prerequisites
+          ## 📋 Prerequisites
           - Node.js 20.x or higher
-          - MongoDB Atlas account
+          - MongoDB Atlas account with connection string
+          - npm or yarn
           
-          ## Backend Setup
-          1. Navigate to `backend/` directory
-          2. Copy `.env.example` to `.env` and configure:
-             - Update `MONGODB_ATLAS_URI` with your MongoDB Atlas connection string
-             - Set `NODE_ENV=production`
-          4. Set `PORT` (default: 3000)
+          ## 🔧 Backend Deployment
           
-          ## Running the Application
+          ### 1. Navigate to backend directory
+          ```bash
+          cd backend
+          ```
+          
+          ### 2. Install dependencies
+          ```bash
+          npm ci --production
+          ```
+          
+          ### 3. Configure environment
+          ```bash
+          cp .env.example .env
+          ```
+          
+          Edit `.env` and set:
+          - `MONGODB_ATLAS_URI` - Your MongoDB connection string
+          - `NODE_ENV=production`
+          - `PORT=3000` (or your preferred port)
+          
+          ### 4. Start the server
           ```bash
           npm start
           ```
           
-          ## Health Check
-          Visit: http://localhost:3000/health
+          Or with PM2:
+          ```bash
+          pm2 start src/index.js --name ab-testing-backend
+          ```
           
-          ## Environment Variables
-          See `.env.example` for all required configuration.
+          ### 5. Verify
+          ```bash
+          curl http://localhost:3000/health
+          ```
           
-          ## Reports
-          This package includes CI/CD reports in the `reports/` directory:
-          - Test results (test-results/)
-          - Code coverage (coverage/)
-          - Lint report (lint-report/)
-          - Security audit (security-report.json)
+          ---
+          
+          ## 🌐 Frontend Deployment
+          
+          The `frontend/` directory contains pre-built static files ready to deploy.
+          
+          ### Option 1: Static Hosting (Vercel, Netlify, etc.)
+          Upload the entire `frontend/` directory to your hosting provider.
+          
+          ### Option 2: Nginx
+          ```nginx
+          server {
+              listen 80;
+              server_name your-domain.com;
+              root /path/to/deployment/frontend;
+              index index.html;
+              
+              location / {
+                  try_files $uri $uri/ /index.html;
+              }
+          }
+          ```
+          
+          ### Option 3: Simple HTTP Server
+          ```bash
+          cd frontend
+          npx serve -s . -p 8080
+          ```
+          
+          ---
+          
+          ## 📊 Reports
+          
+          This package includes CI/CD reports in `reports/`:
+          
+          **Backend:**
+          - Test Results: `backend-test-results/junit.xml`
+          - Code Coverage: `backend-coverage/lcov-report/index.html`
+          - Lint Report: `lint-report/backend-eslint.html`
+          
+          **Frontend:**
+          - Code Coverage: `frontend-coverage/index.html`
+          - Lint Report: `lint-report/frontend-eslint.html`
+          
+          **Security:**
+          - Audit Report: `security-report.json`
+          
+          ---
+          
+          ## 🔍 Troubleshooting
+          
+          **Backend won't start:**
+          - Check MongoDB connection string in `.env`
+          - Ensure port is not in use: `lsof -i :3000`
+          - Check logs for errors
+          
+          **Frontend 404 errors:**
+          - Ensure server is configured for SPA routing
+          - Set correct API URL in environment variables
+          
           EOF
           
-          # Create deployment package
+          # ============================================
+          # CREATE DEPLOYMENT PACKAGE (ZIP)
+          # ============================================
+          echo "Creating deployment archive..."
           cd deployment
-          zip -r ../deployment-package-${{ github.run_id }}.zip .
+          
+          # Exclude unnecessary files from zip
+          zip -r ../deployment-package-${{ github.run_id }}.zip . \
+            -x "*.git*" \
+            -x "node_modules/*" \
+            -x "*/node_modules/*" \
+            -x ".DS_Store"
+          
           cd ..
+          
+          # Show package info
+          echo "✓ Deployment package created!"
+          ls -lh deployment-package-${{ github.run_id }}.zip
 
       - name: Upload deployment artifact
         uses: actions/upload-artifact@v4
