@@ -236,7 +236,6 @@ jobs:
           mkdir -p deployment/backend
           cp -r apps/backend/src deployment/backend/
           cp apps/backend/package.json deployment/backend/
-          cp apps/backend/package-lock.json deployment/backend/
           cp apps/backend/.env.example deployment/backend/ 2>/dev/null || echo "No backend .env.example"
           
           # Copy frontend build
@@ -251,6 +250,9 @@ jobs:
           # Copy reports
           cp -r reports deployment/reports/
           
+          # Copy root package-lock.json for backend dependencies
+          cp package-lock.json deployment/backend/
+          
           # Install production dependencies for backend
           cd deployment/backend
           npm ci --production --ignore-scripts
@@ -261,23 +263,14 @@ jobs:
           # Deployment Instructions
           
           ## Prerequisites
-          - Node.js 18.x or higher
+          - Node.js 20.x or higher
           - MongoDB Atlas account
           
           ## Backend Setup
           1. Navigate to `backend/` directory
-          2. Copy `.env.example` to `.env` and configure
-          3. Run: `npm start`
-          
-          ## Frontend Setup
-          1. Serve the `frontend/dist/` directory with any static file server
-          2. Configure VITE_API_URL to point to your backend
-          
-          ## Full Documentation
-          See `docs/` folder for detailed guides.
-          EOF
-          2. Update `MONGODB_ATLAS_URI` with your MongoDB Atlas connection string
-          3. Set `NODE_ENV=production`
+          2. Copy `.env.example` to `.env` and configure:
+             - Update `MONGODB_ATLAS_URI` with your MongoDB Atlas connection string
+             - Set `NODE_ENV=production`
           4. Set `PORT` (default: 3000)
           
           ## Running the Application
