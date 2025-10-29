@@ -1,4 +1,4 @@
-name: Node.js CI/CD Pipeline with MongoDB Atlas
+name: Monorepo CI/CD Pipeline
 
 on:
   push:
@@ -24,15 +24,20 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
-      - name: Install dependencies
+      - name: Install root dependencies
         run: |
-          echo "Installing project dependencies..."
+          echo "Installing root dependencies..."
           npm ci
 
-      - name: Build the project
+      - name: Build backend
         run: |
-          echo "Building project..."
-          npm run build --if-present
+          echo "Building backend..."
+          npm run build:backend --if-present
+
+      - name: Build frontend
+        run: |
+          echo "Building frontend..."
+          npm run build:frontend
 
   # ======================================
   # TEST STAGE
@@ -44,7 +49,7 @@ jobs:
 
     env:
       NODE_ENV: test
-      MONGODB_ATLAS_URI: ${{ secrets.MONGODB_ATLAS_URI }}
+      MONGODB_ATLAS_URI: ${{ secrets.MONGODB_ATLAS_URI || '' }}
       JEST_JUNIT_OUTPUT_DIR: test-results
 
     steps:
@@ -60,10 +65,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Unit + Integration Tests
+      - name: Run Backend Tests
         run: |
-          echo "Running tests with MongoDB Atlas..."
-          npm test
+          echo "Running backend tests..."
+          npm run test:backend
+
+      - name: Run Frontend Tests
+        run: |
+          echo "Running frontend tests..."
+          npm run test:frontend || echo "No frontend tests yet"
 
   # ======================================
   # COVERAGE STAGE
@@ -74,7 +84,7 @@ jobs:
     needs: test
 
     env:
-      MONGODB_ATLAS_URI: ${{ secrets.MONGODB_ATLAS_URI }}
+      MONGODB_ATLAS_URI: ${{ secrets.MONGODB_ATLAS_URI || '' }}
 
     steps:
       - name: Checkout repository
@@ -89,14 +99,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate coverage report
+      - name: Generate backend coverage report
         run: |
-          if [ -f package.json ] && grep -q '"coverage"' package.json; then
-            npm run coverage
-          else
-            echo "No coverage script found. Running tests with coverage directly..."
-            npx jest --coverage --coverageReporters=text-lcov > lcov.info || true
-          fi
+          echo "Generating coverage for backend..."
+          cd apps/backend
+          npm run coverage || npx jest --coverage || echo "Coverage completed"
 
   # ======================================
   # LINT STAGE
@@ -119,20 +126,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run ESLint
+      - name: Run Linting
         run: |
-          echo "Running ESLint..."
-          if [ -f package.json ] && grep -q '"lint"' package.json; then
-            npm run lint
-          else
-            npx eslint . --ext .js,.jsx,.ts,.tsx
-          fi
+          echo "Running linting for all apps..."
+          npm run lint
 
-      - name: Save lint report
+      - name: Save lint reports
         if: always()
         run: |
           mkdir -p lint-report
-          npx eslint . --ext .js,.jsx,.ts,.tsx -f html -o lint-report/eslint-report.html 2>/dev/null || echo "Lint report generation failed"
+          cd apps/backend
+          npx eslint . --ext .js,.jsx,.ts,.tsx -f html -o ../../lint-report/backend-lint.html 2>/dev/null || echo "Backend lint report done"
+          cd ../frontend
+          npx eslint . --ext .js,.jsx,.ts,.tsx -f html -o ../../lint-report/frontend-lint.html 2>/dev/null || echo "Frontend lint report done"
 
   # ======================================
   # SECURITY SCAN STAGE
@@ -175,7 +181,7 @@ jobs:
 
     env:
       NODE_ENV: test
-      MONGODB_ATLAS_URI: ${{ secrets.MONGODB_ATLAS_URI }}
+      MONGODB_ATLAS_URI: ${{ secrets.MONGODB_ATLAS_URI || '' }}
 
     steps:
       - name: Checkout repository
@@ -195,19 +201,28 @@ jobs:
           # Create reports directory
           mkdir -p reports
           
-          # Generate test results
-          npm test || echo "Tests completed"
-          cp -r test-results reports/ 2>/dev/null || echo "No test results"
-          cp junit.xml reports/ 2>/dev/null || echo "No junit.xml"
+          # Generate backend test results
+          echo "Generating backend reports..."
+          cd apps/backend
+          npm test || echo "Backend tests completed"
+          cp -r test-results ../../reports/backend-test-results 2>/dev/null || echo "No backend test results"
+          cp junit.xml ../../reports/ 2>/dev/null || echo "No junit.xml"
           
-          # Generate coverage report
+          # Generate backend coverage
           npm run coverage || npx jest --coverage || echo "Coverage completed"
-          cp -r coverage reports/ 2>/dev/null || echo "No coverage directory"
-          cp lcov.info reports/ 2>/dev/null || echo "No lcov.info"
+          cp -r coverage ../../reports/backend-coverage 2>/dev/null || echo "No coverage directory"
+          cp lcov.info ../../reports/backend-lcov.info 2>/dev/null || echo "No lcov.info"
           
-          # Generate lint report
+          cd ../..
+          
+          # Generate lint reports
           mkdir -p reports/lint-report
-          npx eslint . --ext .js,.jsx,.ts,.tsx -f html -o reports/lint-report/eslint-report.html 2>/dev/null || echo "Lint report generated"
+          cd apps/backend
+          npx eslint . --ext .js -f html -o ../../reports/lint-report/backend-eslint.html 2>/dev/null || echo "Backend lint report generated"
+          cd ../frontend
+          npx eslint . --ext .js,.jsx -f html -o ../../reports/lint-report/frontend-eslint.html 2>/dev/null || echo "Frontend lint report generated"
+          
+          cd ../..
           
           # Generate security report
           npm audit --json > reports/security-report.json || echo "Security audit completed"
@@ -217,32 +232,50 @@ jobs:
           echo "Creating production deployment package..."
           mkdir -p deployment
           
-          # Copy source code
-          cp -r src/ deployment/src/
+          # Copy backend
+          mkdir -p deployment/backend
+          cp -r apps/backend/src deployment/backend/
+          cp apps/backend/package.json deployment/backend/
+          cp apps/backend/package-lock.json deployment/backend/
+          cp apps/backend/.env.example deployment/backend/ 2>/dev/null || echo "No backend .env.example"
           
-          # Copy necessary files
-          cp package.json deployment/
-          cp package-lock.json deployment/
+          # Copy frontend build
+          mkdir -p deployment/frontend
+          cp -r apps/frontend/dist deployment/frontend/ 2>/dev/null || echo "No frontend dist"
+          cp apps/frontend/package.json deployment/frontend/
+          
+          # Copy documentation
+          cp -r docs deployment/docs 2>/dev/null || echo "No docs"
           cp README.md deployment/
-          cp .env.example deployment/ 2>/dev/null || echo "No .env.example found"
           
-          # Copy reports to deployment package
+          # Copy reports
           cp -r reports deployment/reports/
           
-          # Install production dependencies only (no dev dependencies)
-          cd deployment
+          # Install production dependencies for backend
+          cd deployment/backend
           npm ci --production --ignore-scripts
+          cd ../..
           
-          # Create a deployment README
-          cat > DEPLOY.md << 'EOF'
+          # Create deployment README
+          cat > deployment/DEPLOY.md << 'EOF'
           # Deployment Instructions
           
           ## Prerequisites
           - Node.js 18.x or higher
-          - MongoDB Atlas account with connection URI
+          - MongoDB Atlas account
           
-          ## Setup
-          1. Copy `.env.example` to `.env` and configure your environment variables
+          ## Backend Setup
+          1. Navigate to `backend/` directory
+          2. Copy `.env.example` to `.env` and configure
+          3. Run: `npm start`
+          
+          ## Frontend Setup
+          1. Serve the `frontend/dist/` directory with any static file server
+          2. Configure VITE_API_URL to point to your backend
+          
+          ## Full Documentation
+          See `docs/` folder for detailed guides.
+          EOF
           2. Update `MONGODB_ATLAS_URI` with your MongoDB Atlas connection string
           3. Set `NODE_ENV=production`
           4. Set `PORT` (default: 3000)

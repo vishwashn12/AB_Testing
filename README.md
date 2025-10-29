@@ -1,23 +1,60 @@
-# Node.js CI/CD Project
+# A/B Testing Platform
 
-A Node.js project with complete CI/CD pipeline using GitHub Actions.
+Full-stack A/B testing platform with Node.js backend and React frontend.
 
-## Features
-- Automated testing with Jest
-- Code coverage reporting
-- ESLint code quality checks
-- Security vulnerability scanning
-- MongoDB integration testing
-- Automated deployment artifacts
+## Stack
 
-## Setup
-1. Clone the repository
-2. Run `npm install`
-3. Copy `.github/workflows/ci-cd.yml` to your project
-4. Push to GitHub to trigger the pipeline
+**Backend:** Node.js, Express, MongoDB Atlas, Jest  
+**Frontend:** React, Vite, Tailwind CSS  
+**Monorepo:** npm workspaces
 
-## Scripts
-- `npm test` - Run test suite
+## Quick Start
+
+```bash
+# Install
+npm install
+
+# Configure
+cp apps/backend/.env.example apps/backend/.env
+# Add your MONGODB_ATLAS_URI
+
+# Run
+npm run dev
+```
+
+**Access:**
+- Frontend: http://localhost:5173
+- Backend: http://localhost:3000
+
+## Commands
+
+```bash
+npm run dev              # Run both apps
+npm run dev:backend      # Backend only
+npm run dev:frontend     # Frontend only
+npm test                 # Run all tests
+npm run build            # Build all
+npm run lint             # Lint all
+```
+
+## Structure
+
+```
+apps/backend/     - Node.js API
+apps/frontend/    - React UI
+packages/shared/  - Shared utilities
+docs/             - Documentation
+```
+
+## Docs
+
+- [Setup Guide](./docs/SETUP.md)
+- [API Docs](./docs/API.md)
+- [Deployment](./docs/DEPLOYMENT.md)
+
+## Author
+
+**vishwashn12** - [GitHub](https://github.com/vishwashn12)
 - `npm run lint` - Run ESLint
 - `npm run build` - Build project
 - `npm run coverage` - Generate coverage report

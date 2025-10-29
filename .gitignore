@@ -1,34 +1,63 @@
 # Dependencies
 node_modules/
 
-# Environment
+# Environment files
 .env
 .env.local
 .env.*.local
+apps/**/.env
+apps/**/.env.local
 
 # Build outputs
 dist/
 build/
+apps/**/dist/
+apps/**/build/
+
+# Test & Coverage
+coverage/
+test-results/
+*.lcov
+lcov.info
+junit.xml
+
+# CI/CD
+reports/
+artifacts/
 
 # Logs
 *.log
 npm-debug.log*
-
-# Coverage
-coverage/
-
-# CI/CD artifacts
-artifacts/
-test-results/
+yarn-debug.log*
+yarn-error.log*
+logs/
 
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
 # OS
 .DS_Store
 Thumbs.db
+*.pid
+*.seed
 
-# Temporary files
+# Temporary
 tmp/
 *.tmp
+.cache/
+
+# Package manager
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+.pnpm-store/
+.turbo/
