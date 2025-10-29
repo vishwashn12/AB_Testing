@@ -256,11 +256,10 @@ jobs:
         run: |
           echo "Creating source code package..."
           
-          # Copy entire repository without node_modules, .git, .github
+          # Copy entire repository including workflows
           rsync -av --progress \
             --exclude 'node_modules' \
             --exclude '.git' \
-            --exclude '.github' \
             --exclude 'reports' \
             --exclude '*.zip' \
             ./ source-code/
