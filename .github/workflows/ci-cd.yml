@@ -8,10 +8,10 @@ on:
 
 jobs:
   # ======================================
-  # 1️⃣ BUILD STAGE
+  # BUILD STAGE
   # ======================================
   build:
-    name: 🏗️ Build Stage
+    name: Build Stage
     runs-on: ubuntu-latest
 
     steps:
@@ -35,10 +35,10 @@ jobs:
           npm run build --if-present
 
   # ======================================
-  # 2️⃣ TEST STAGE
+  # TEST STAGE
   # ======================================
   test:
-    name: 🧪 Test Stage
+    name: Test Stage
     runs-on: ubuntu-latest
     needs: build
 
@@ -65,21 +65,11 @@ jobs:
           echo "Running tests with MongoDB Atlas..."
           npm test
 
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: |
-            test-results/
-            junit.xml
-          retention-days: 7
-
   # ======================================
-  # 3️⃣ COVERAGE STAGE
+  # COVERAGE STAGE
   # ======================================
   coverage:
-    name: 📊 Coverage Stage
+    name: Coverage Stage
     runs-on: ubuntu-latest
     needs: test
 
@@ -108,20 +98,11 @@ jobs:
             npx jest --coverage --coverageReporters=text-lcov > lcov.info || true
           fi
 
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: |
-            coverage/
-            lcov.info
-          retention-days: 30
-
   # ======================================
-  # 4️⃣ LINT STAGE
+  # LINT STAGE
   # ======================================
   lint:
-    name: 🔍 Lint Stage
+    name: Lint Stage
     runs-on: ubuntu-latest
     needs: test
 
@@ -153,19 +134,11 @@ jobs:
           mkdir -p lint-report
           npx eslint . --ext .js,.jsx,.ts,.tsx -f html -o lint-report/eslint-report.html 2>/dev/null || echo "Lint report generation failed"
 
-      - name: Upload lint report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: lint-report
-          path: lint-report/
-          retention-days: 7
-
   # ======================================
-  # 5️⃣ SECURITY SCAN STAGE
+  # SECURITY SCAN STAGE
   # ======================================
   security:
-    name: 🛡️ Security Scan Stage
+    name: Security Scan Stage
     runs-on: ubuntu-latest
     needs: test
 
@@ -192,19 +165,11 @@ jobs:
         run: |
           npm audit --json > security-report.json || echo "Security audit completed with issues"
 
-      - name: Upload security report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: security-report
-          path: security-report.json
-          retention-days: 7
-
   # ======================================
-  # 6️⃣ DEPLOYMENT ARTIFACT STAGE
+  # DEPLOYMENT ARTIFACT STAGE
   # ======================================
   deploy:
-    name: 🚀 Deployment Artifact
+    name: Deployment Artifact
     runs-on: ubuntu-latest
     needs: [build, test, coverage, lint, security]
 
@@ -212,10 +177,36 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          path: artifacts/
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run all report generation
+        run: |
+          # Create reports directory
+          mkdir -p reports
+          
+          # Generate test results
+          npm test || echo "Tests completed"
+          cp -r test-results reports/ 2>/dev/null || echo "No test results"
+          cp junit.xml reports/ 2>/dev/null || echo "No junit.xml"
+          
+          # Generate coverage report
+          npm run coverage || npx jest --coverage || echo "Coverage completed"
+          cp -r coverage reports/ 2>/dev/null || echo "No coverage directory"
+          cp lcov.info reports/ 2>/dev/null || echo "No lcov.info"
+          
+          # Generate lint report
+          mkdir -p reports/lint-report
+          npx eslint . --ext .js,.jsx,.ts,.tsx -f html -o reports/lint-report/eslint-report.html 2>/dev/null || echo "Lint report generated"
+          
+          # Generate security report
+          npm audit --json > reports/security-report.json || echo "Security audit completed"
 
       - name: Create deployment package
         run: |
@@ -226,9 +217,8 @@ jobs:
           cp -r build/ deployment/ 2>/dev/null || echo "No build directory"
           cp README.md package.json package-lock.json deployment/ 2>/dev/null || echo "Some files missing"
           
-          # Create reports directory
-          mkdir -p deployment/reports
-          cp -r artifacts/* deployment/reports/ 2>/dev/null || echo "No artifacts to copy"
+          # Copy reports to deployment package
+          cp -r reports deployment/ 2>/dev/null || echo "No reports to copy"
           
           # Create deployment package
           cd deployment
