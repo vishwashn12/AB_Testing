@@ -44,7 +44,7 @@ jobs:
 
     env:
       NODE_ENV: test
-      MONGODB_ATLAS_URI: ${{ secrets.MONGODB_ATLAS_URI_TEST }}
+      MONGODB_ATLAS_URI: ${{ secrets.MONGODB_ATLAS_URI }}
       JEST_JUNIT_OUTPUT_DIR: test-results
 
     steps:
@@ -74,7 +74,7 @@ jobs:
     needs: test
 
     env:
-      MONGODB_ATLAS_URI: ${{ secrets.MONGODB_ATLAS_URI_TEST }}
+      MONGODB_ATLAS_URI: ${{ secrets.MONGODB_ATLAS_URI }}
 
     steps:
       - name: Checkout repository
@@ -175,7 +175,7 @@ jobs:
 
     env:
       NODE_ENV: test
-      MONGODB_ATLAS_URI: ${{ secrets.MONGODB_ATLAS_URI_TEST }}
+      MONGODB_ATLAS_URI: ${{ secrets.MONGODB_ATLAS_URI }}
 
     steps:
       - name: Checkout repository

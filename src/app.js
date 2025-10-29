@@ -42,7 +42,8 @@ app.get('/api/users', async (req, res) => {
 });
 
 // Error handling middleware
-app.use((err, req, res, _next) => {
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: 'Something went wrong!' });
 });
