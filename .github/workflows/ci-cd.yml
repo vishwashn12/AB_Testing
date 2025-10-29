@@ -186,7 +186,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run all report generation
+      - name: Generate all reports
         run: |
           # Create reports directory
           mkdir -p reports
@@ -208,17 +208,61 @@ jobs:
           # Generate security report
           npm audit --json > reports/security-report.json || echo "Security audit completed"
 
-      - name: Create deployment package
+      - name: Create production deployment package
         run: |
+          echo "Creating production deployment package..."
           mkdir -p deployment
-          # Copy source files
-          cp -r src/ deployment/ 2>/dev/null || echo "No src directory"
-          cp -r dist/ deployment/ 2>/dev/null || echo "No dist directory"
-          cp -r build/ deployment/ 2>/dev/null || echo "No build directory"
-          cp README.md package.json package-lock.json deployment/ 2>/dev/null || echo "Some files missing"
+          
+          # Copy source code
+          cp -r src/ deployment/src/
+          
+          # Copy necessary files
+          cp package.json deployment/
+          cp package-lock.json deployment/
+          cp README.md deployment/
+          cp .env.example deployment/ 2>/dev/null || echo "No .env.example found"
           
           # Copy reports to deployment package
-          cp -r reports deployment/ 2>/dev/null || echo "No reports to copy"
+          cp -r reports deployment/reports/
+          
+          # Install production dependencies only (no dev dependencies)
+          cd deployment
+          npm ci --production --ignore-scripts
+          
+          # Create a deployment README
+          cat > DEPLOY.md << 'EOF'
+          # Deployment Instructions
+          
+          ## Prerequisites
+          - Node.js 18.x or higher
+          - MongoDB Atlas account with connection URI
+          
+          ## Setup
+          1. Copy `.env.example` to `.env` and configure your environment variables
+          2. Update `MONGODB_ATLAS_URI` with your MongoDB Atlas connection string
+          3. Set `NODE_ENV=production`
+          4. Set `PORT` (default: 3000)
+          
+          ## Running the Application
+          ```bash
+          npm start
+          ```
+          
+          ## Health Check
+          Visit: http://localhost:3000/health
+          
+          ## Environment Variables
+          See `.env.example` for all required configuration.
+          
+          ## Reports
+          This package includes CI/CD reports in the `reports/` directory:
+          - Test results (test-results/)
+          - Code coverage (coverage/)
+          - Lint report (lint-report/)
+          - Security audit (security-report.json)
+          EOF
+          
+          cd ..
           
           # Create deployment package
           cd deployment
@@ -230,4 +274,4 @@ jobs:
         with:
           name: deployment-package
           path: deployment-package-*.zip
-          retention-days: 30
+          retention-days: 90
