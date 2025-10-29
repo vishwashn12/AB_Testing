@@ -257,98 +257,78 @@ jobs:
           mkdir -p deployment
           
           # ============================================
-          # BACKEND - Copy source and dependencies info
+          # COPY ENTIRE REPOSITORY STRUCTURE
           # ============================================
-          echo "Packaging backend..."
-          mkdir -p deployment/backend
+          echo "Copying entire repository structure..."
           
-          # Copy backend source code
-          cp -r apps/backend/src deployment/backend/
-          
-          # Copy backend config files
-          cp apps/backend/package.json deployment/backend/
-          cp apps/backend/.env.example deployment/backend/ 2>/dev/null || echo "Warning: No .env.example found"
-          
-          # Copy only package-lock for dependency installation (not node_modules)
-          cp package-lock.json deployment/backend/
+          # Copy all repository files and folders
+          rsync -av --progress \
+            --exclude 'node_modules' \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'deployment' \
+            --exclude '*.zip' \
+            ./ deployment/
           
           # ============================================
-          # FRONTEND - Copy built static files
+          # ADD REPORTS - Organized by app
           # ============================================
-          echo "Packaging frontend..."
-          mkdir -p deployment/frontend
-          
-          # Copy frontend dist (built files)
-          if [ -d "apps/frontend/dist" ]; then
-            cp -r apps/frontend/dist/* deployment/frontend/
-            echo "✓ Frontend build included"
-          else
-            echo "⚠ No frontend build found - run 'npm run build:frontend' first"
-          fi
-          
-          # ============================================
-          # REPORTS - Organized by app
-          # ============================================
-          echo "Organizing reports..."
-          mkdir -p deployment/reports/backend deployment/reports/frontend
+          echo "Adding reports..."
+          mkdir -p deployment/ci-reports/backend deployment/ci-reports/frontend
           
           # Backend reports
+          echo "Copying backend reports..."
           if [ -d "reports/backend-test-results" ]; then
-            cp -r reports/backend-test-results deployment/reports/backend/test-results
+            cp -r reports/backend-test-results deployment/ci-reports/backend/test-results
           fi
           if [ -d "reports/backend-coverage" ]; then
-            cp -r reports/backend-coverage deployment/reports/backend/coverage
+            cp -r reports/backend-coverage deployment/ci-reports/backend/coverage
           fi
           if [ -f "reports/backend-lcov.info" ]; then
-            cp reports/backend-lcov.info deployment/reports/backend/
+            cp reports/backend-lcov.info deployment/ci-reports/backend/
           fi
           if [ -f "reports/lint-report/backend-eslint.html" ]; then
-            mkdir -p deployment/reports/backend/lint
-            cp reports/lint-report/backend-eslint.html deployment/reports/backend/lint/report.html
+            mkdir -p deployment/ci-reports/backend/lint
+            cp reports/lint-report/backend-eslint.html deployment/ci-reports/backend/lint/report.html
           fi
           
           # Frontend reports
+          echo "Copying frontend reports..."
           if [ -d "reports/frontend-coverage" ]; then
-            cp -r reports/frontend-coverage deployment/reports/frontend/coverage
+            cp -r reports/frontend-coverage deployment/ci-reports/frontend/coverage
           fi
           if [ -f "reports/lint-report/frontend-eslint.html" ]; then
-            mkdir -p deployment/reports/frontend/lint
-            cp reports/lint-report/frontend-eslint.html deployment/reports/frontend/lint/report.html
+            mkdir -p deployment/ci-reports/frontend/lint
+            cp reports/lint-report/frontend-eslint.html deployment/ci-reports/frontend/lint/report.html
           fi
           
           # Security report (root level)
           if [ -f "reports/security-report.json" ]; then
-            cp reports/security-report.json deployment/reports/
+            cp reports/security-report.json deployment/ci-reports/security-report.json
           fi
-          
-          # ============================================
-          # DOCUMENTATION
-          # ============================================
-          echo "Copying documentation..."
-          
-          # Copy docs
-          if [ -d "docs" ]; then
-            cp -r docs deployment/
-          fi
-          
-          # Copy root README
-          cp README.md deployment/ 2>/dev/null || true
           
           # ============================================
           # CREATE DEPLOYMENT PACKAGE (ZIP)
           # ============================================
           echo "Creating deployment archive..."
           
-          # Create zip from deployment folder, explicitly excluding node_modules
-          zip -r deployment-package-${{ github.run_id }}.zip deployment \
+          # Create zip from deployment folder
+          cd deployment
+          zip -r ../deployment-package-${{ github.run_id }}.zip . \
+            -x "node_modules/*" \
             -x "*/node_modules/*" \
+            -x ".git/*" \
             -x "*/.git/*" \
-            -x "*/.DS_Store" \
-            -x "*.zip"
+            -x ".DS_Store" \
+            -x "*/.DS_Store"
+          cd ..
           
           # Show package info
           echo "✓ Deployment package created!"
           ls -lh deployment-package-${{ github.run_id }}.zip
+          echo ""
+          echo "Package contents:"
+          unzip -l deployment-package-${{ github.run_id }}.zip | head -50
 
       - name: Upload deployment artifact
         uses: actions/upload-artifact@v4
