@@ -251,88 +251,110 @@ jobs:
           echo "Generating security report..."
           npm audit --json > reports/security-report.json || echo "Security audit completed"
 
-      - name: Create production deployment package
+      - name: Create source code artifact
         run: |
-          echo "Creating production deployment package..."
-          mkdir -p deployment
+          echo "Creating source code package..."
           
-          # ============================================
-          # COPY ENTIRE REPOSITORY STRUCTURE
-          # ============================================
-          echo "Copying entire repository structure..."
-          
-          # Copy all repository files and folders
+          # Copy entire repository without node_modules, .git, .github
           rsync -av --progress \
             --exclude 'node_modules' \
             --exclude '.git' \
             --exclude '.github' \
-            --exclude 'deployment' \
+            --exclude 'reports' \
             --exclude '*.zip' \
-            ./ deployment/
+            ./ source-code/
+          
+          # Create zip
+          zip -r source-code-${{ github.run_id }}.zip source-code
+          
+          echo "✓ Source code package created!"
+          ls -lh source-code-${{ github.run_id }}.zip
+
+      - name: Create reports artifact
+        run: |
+          echo "Organizing CI/CD reports..."
+          mkdir -p ci-reports/backend ci-reports/frontend
           
           # ============================================
-          # ADD REPORTS - Organized by app
+          # BACKEND REPORTS
           # ============================================
-          echo "Adding reports..."
-          mkdir -p deployment/ci-reports/backend deployment/ci-reports/frontend
+          echo "Organizing backend reports..."
           
-          # Backend reports
-          echo "Copying backend reports..."
+          # Test results
           if [ -d "reports/backend-test-results" ]; then
-            cp -r reports/backend-test-results deployment/ci-reports/backend/test-results
+            cp -r reports/backend-test-results ci-reports/backend/test-results
           fi
+          
+          # Coverage
           if [ -d "reports/backend-coverage" ]; then
-            cp -r reports/backend-coverage deployment/ci-reports/backend/coverage
+            cp -r reports/backend-coverage ci-reports/backend/coverage
           fi
           if [ -f "reports/backend-lcov.info" ]; then
-            cp reports/backend-lcov.info deployment/ci-reports/backend/
+            cp reports/backend-lcov.info ci-reports/backend/lcov.info
           fi
+          
+          # Lint
           if [ -f "reports/lint-report/backend-eslint.html" ]; then
-            mkdir -p deployment/ci-reports/backend/lint
-            cp reports/lint-report/backend-eslint.html deployment/ci-reports/backend/lint/report.html
+            mkdir -p ci-reports/backend/lint
+            cp reports/lint-report/backend-eslint.html ci-reports/backend/lint/report.html
           fi
           
-          # Frontend reports
-          echo "Copying frontend reports..."
+          # ============================================
+          # FRONTEND REPORTS
+          # ============================================
+          echo "Organizing frontend reports..."
+          
+          # Coverage (Vitest generates coverage with test results)
           if [ -d "reports/frontend-coverage" ]; then
-            cp -r reports/frontend-coverage deployment/ci-reports/frontend/coverage
+            cp -r reports/frontend-coverage ci-reports/frontend/coverage
           fi
+          
+          # Lint
           if [ -f "reports/lint-report/frontend-eslint.html" ]; then
-            mkdir -p deployment/ci-reports/frontend/lint
-            cp reports/lint-report/frontend-eslint.html deployment/ci-reports/frontend/lint/report.html
+            mkdir -p ci-reports/frontend/lint
+            cp reports/lint-report/frontend-eslint.html ci-reports/frontend/lint/report.html
           fi
           
-          # Security report (root level)
+          # ============================================
+          # SECURITY REPORT
+          # ============================================
           if [ -f "reports/security-report.json" ]; then
-            cp reports/security-report.json deployment/ci-reports/security-report.json
+            cp reports/security-report.json ci-reports/security-report.json
           fi
           
-          # ============================================
-          # CREATE DEPLOYMENT PACKAGE (ZIP)
-          # ============================================
-          echo "Creating deployment archive..."
+          # Create summary
+          cat > ci-reports/README.md << 'EOF'
+          # CI/CD Reports
           
-          # Create zip from deployment folder
-          cd deployment
-          zip -r ../deployment-package-${{ github.run_id }}.zip . \
-            -x "node_modules/*" \
-            -x "*/node_modules/*" \
-            -x ".git/*" \
-            -x "*/.git/*" \
-            -x ".DS_Store" \
-            -x "*/.DS_Store"
-          cd ..
+          ## Backend Reports
+          - **Test Results**: `backend/test-results/junit.xml`
+          - **Code Coverage**: `backend/coverage/lcov-report/index.html`
+          - **Lint Report**: `backend/lint/report.html`
           
-          # Show package info
-          echo "✓ Deployment package created!"
-          ls -lh deployment-package-${{ github.run_id }}.zip
-          echo ""
-          echo "Package contents:"
-          unzip -l deployment-package-${{ github.run_id }}.zip | head -50
+          ## Frontend Reports
+          - **Code Coverage**: `frontend/coverage/index.html`
+          - **Lint Report**: `frontend/lint/report.html`
+          
+          ## Security
+          - **Audit Report**: `security-report.json`
+          EOF
+          
+          # Create zip
+          zip -r ci-reports-${{ github.run_id }}.zip ci-reports
+          
+          echo "✓ Reports package created!"
+          ls -lh ci-reports-${{ github.run_id }}.zip
 
-      - name: Upload deployment artifact
+      - name: Upload source code artifact
         uses: actions/upload-artifact@v4
         with:
-          name: deployment-package
-          path: deployment-package-*.zip
+          name: source-code
+          path: source-code-*.zip
+          retention-days: 90
+
+      - name: Upload reports artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-reports
+          path: ci-reports-*.zip
           retention-days: 90
