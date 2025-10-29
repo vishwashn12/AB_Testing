@@ -173,6 +173,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build, test, coverage, lint, security]
 
+    env:
+      NODE_ENV: test
+      MONGODB_ATLAS_URI: ${{ secrets.MONGODB_ATLAS_URI_TEST }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
