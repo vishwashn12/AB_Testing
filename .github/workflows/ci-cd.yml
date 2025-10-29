@@ -287,9 +287,44 @@ jobs:
           fi
           
           # ============================================
-          # DOCUMENTATION & REPORTS
+          # REPORTS - Organized by app
           # ============================================
-          echo "Copying documentation and reports..."
+          echo "Organizing reports..."
+          mkdir -p deployment/reports/backend deployment/reports/frontend
+          
+          # Backend reports
+          if [ -d "reports/backend-test-results" ]; then
+            cp -r reports/backend-test-results deployment/reports/backend/test-results
+          fi
+          if [ -d "reports/backend-coverage" ]; then
+            cp -r reports/backend-coverage deployment/reports/backend/coverage
+          fi
+          if [ -f "reports/backend-lcov.info" ]; then
+            cp reports/backend-lcov.info deployment/reports/backend/
+          fi
+          if [ -f "reports/lint-report/backend-eslint.html" ]; then
+            mkdir -p deployment/reports/backend/lint
+            cp reports/lint-report/backend-eslint.html deployment/reports/backend/lint/report.html
+          fi
+          
+          # Frontend reports
+          if [ -d "reports/frontend-coverage" ]; then
+            cp -r reports/frontend-coverage deployment/reports/frontend/coverage
+          fi
+          if [ -f "reports/lint-report/frontend-eslint.html" ]; then
+            mkdir -p deployment/reports/frontend/lint
+            cp reports/lint-report/frontend-eslint.html deployment/reports/frontend/lint/report.html
+          fi
+          
+          # Security report (root level)
+          if [ -f "reports/security-report.json" ]; then
+            cp reports/security-report.json deployment/reports/
+          fi
+          
+          # ============================================
+          # DOCUMENTATION
+          # ============================================
+          echo "Copying documentation..."
           
           # Copy docs
           if [ -d "docs" ]; then
@@ -299,135 +334,17 @@ jobs:
           # Copy root README
           cp README.md deployment/ 2>/dev/null || true
           
-          # Copy CI/CD reports
-          if [ -d "reports" ]; then
-            cp -r reports deployment/
-          fi
-          
-          # ============================================
-          # CREATE DEPLOYMENT INSTRUCTIONS
-          # ============================================
-          cat > deployment/DEPLOY.md << 'EOF'
-          # 🚀 Deployment Guide
-          
-          ## 📋 Prerequisites
-          - Node.js 20.x or higher
-          - MongoDB Atlas account with connection string
-          - npm or yarn
-          
-          ## 🔧 Backend Deployment
-          
-          ### 1. Navigate to backend directory
-          ```bash
-          cd backend
-          ```
-          
-          ### 2. Install dependencies
-          ```bash
-          npm ci --production
-          ```
-          
-          ### 3. Configure environment
-          ```bash
-          cp .env.example .env
-          ```
-          
-          Edit `.env` and set:
-          - `MONGODB_ATLAS_URI` - Your MongoDB connection string
-          - `NODE_ENV=production`
-          - `PORT=3000` (or your preferred port)
-          
-          ### 4. Start the server
-          ```bash
-          npm start
-          ```
-          
-          Or with PM2:
-          ```bash
-          pm2 start src/index.js --name ab-testing-backend
-          ```
-          
-          ### 5. Verify
-          ```bash
-          curl http://localhost:3000/health
-          ```
-          
-          ---
-          
-          ## 🌐 Frontend Deployment
-          
-          The `frontend/` directory contains pre-built static files ready to deploy.
-          
-          ### Option 1: Static Hosting (Vercel, Netlify, etc.)
-          Upload the entire `frontend/` directory to your hosting provider.
-          
-          ### Option 2: Nginx
-          ```nginx
-          server {
-              listen 80;
-              server_name your-domain.com;
-              root /path/to/deployment/frontend;
-              index index.html;
-              
-              location / {
-                  try_files $uri $uri/ /index.html;
-              }
-          }
-          ```
-          
-          ### Option 3: Simple HTTP Server
-          ```bash
-          cd frontend
-          npx serve -s . -p 8080
-          ```
-          
-          ---
-          
-          ## 📊 Reports
-          
-          This package includes CI/CD reports in `reports/`:
-          
-          **Backend:**
-          - Test Results: `backend-test-results/junit.xml`
-          - Code Coverage: `backend-coverage/lcov-report/index.html`
-          - Lint Report: `lint-report/backend-eslint.html`
-          
-          **Frontend:**
-          - Code Coverage: `frontend-coverage/index.html`
-          - Lint Report: `lint-report/frontend-eslint.html`
-          
-          **Security:**
-          - Audit Report: `security-report.json`
-          
-          ---
-          
-          ## 🔍 Troubleshooting
-          
-          **Backend won't start:**
-          - Check MongoDB connection string in `.env`
-          - Ensure port is not in use: `lsof -i :3000`
-          - Check logs for errors
-          
-          **Frontend 404 errors:**
-          - Ensure server is configured for SPA routing
-          - Set correct API URL in environment variables
-          
-          EOF
-          
           # ============================================
           # CREATE DEPLOYMENT PACKAGE (ZIP)
           # ============================================
           echo "Creating deployment archive..."
-          cd deployment
           
-          # Exclude unnecessary files from zip
-          zip -r ../deployment-package-${{ github.run_id }}.zip . \
-            -x "*.git*" \
-            -x "node_modules/*" \
+          # Create zip from deployment folder, explicitly excluding node_modules
+          zip -r deployment-package-${{ github.run_id }}.zip deployment \
             -x "*/node_modules/*" \
-            -x ".DS_Store"
-          
-          cd ..
+            -x "*/.git/*" \
+            -x "*/.DS_Store" \
+            -x "*.zip"
           
           # Show package info
           echo "✓ Deployment package created!"
