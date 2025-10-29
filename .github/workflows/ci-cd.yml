@@ -227,6 +227,7 @@ jobs:
           
           # Frontend tests & coverage
           npm run coverage || echo "Frontend coverage completed"
+          cp -r test-results ../../reports/frontend-test-results 2>/dev/null || echo "No frontend test results"
           cp -r coverage ../../reports/frontend-coverage 2>/dev/null || echo "No frontend coverage directory"
           
           cd ../..
@@ -304,7 +305,12 @@ jobs:
           # ============================================
           echo "Organizing frontend reports..."
           
-          # Coverage (Vitest generates coverage with test results)
+          # Test results
+          if [ -d "reports/frontend-test-results" ]; then
+            cp -r reports/frontend-test-results ci-reports/frontend/test-results
+          fi
+          
+          # Coverage
           if [ -d "reports/frontend-coverage" ]; then
             cp -r reports/frontend-coverage ci-reports/frontend/coverage
           fi
@@ -332,6 +338,7 @@ jobs:
           - **Lint Report**: `backend/lint/report.html`
           
           ## Frontend Reports
+          - **Test Results**: `frontend/test-results/junit.xml`
           - **Code Coverage**: `frontend/coverage/index.html`
           - **Lint Report**: `frontend/lint/report.html`
           
