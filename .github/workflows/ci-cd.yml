@@ -292,8 +292,6 @@ jobs:
           - Security audit (security-report.json)
           EOF
           
-          cd ..
-          
           # Create deployment package
           cd deployment
           zip -r ../deployment-package-${{ github.run_id }}.zip .
